@@ -17,6 +17,8 @@
 - 适用范围：`md`、`txt`、`json`、`yml`、`yaml`
 - AI 或脚本首次读取中文文件时，必须优先按 `UTF-8` 解码
 - 不依赖系统默认编码推断，避免 PowerShell / IDE 首次读取乱码
+- 推荐 Git 全局配置使用 `core.autocrlf=false` 与 `core.eol=lf`
+- 中文文档与代码默认统一使用 `LF`
 
 如果你在新对话里要让 AI 读取本仓库文件，建议明确写上：
 
