@@ -8,7 +8,7 @@
 
 目标是先把“做什么”确认清楚，不在这一阶段写正式代码。
 
-1. 从 [`docs/工具设计模板.md`](docs/工具设计模板.md) 复制一份设计文档。
+1. 从 [`工具设计模板.md`](工具设计模板.md) 复制一份设计文档。
 2. 与 AI 确认目标、用户、核心流程、范围和成功标准。
 3. 在 Figma 输出关键页面、状态和交互，并把链接写入设计文档。
 4. 人工确认需求和 Figma 交互后，将文档状态改为 `已确认`。
@@ -35,8 +35,7 @@ projects/<工具名>/design.md
 ```text
 VibeFoundry/
 ├─ README.md
-├─ docs/
-│  └─ 工具设计模板.md
+├─ 工具设计模板.md
 └─ projects/
    └─ <工具名>/
       ├─ README.md       # 启动方式、当前能力、已知问题
@@ -52,8 +51,7 @@ VibeFoundry/
 可以直接把下面这段话发给 AI：
 
 ```text
-请按 UTF-8 读取 D:\UGit\VibeFoundry\README.md 和
-D:\UGit\VibeFoundry\docs\工具设计模板.md。
+请按 UTF-8 读取 README.md 和 工具设计模板.md。
 
 我们先执行第一步：确认需求并在 Figma 输出交互。
 在我明确确认前，不要进入代码开发。
