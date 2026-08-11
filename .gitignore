@@ -13,5 +13,8 @@ node_modules/
 dist/
 build/
 
+# Claude Code (local secrets)
+.claude/settings.local.json
+
 # Logs
 *.log
