@@ -6,9 +6,9 @@
 
 - 工具名称：desktop-task-bubble
 - 一句话说明：桌面常驻待办气泡，按优先级和截止时间颜色区分，支持倒计时追踪
-- 状态：讨论中
-- Figma 链接：
-- 最后确认日期：
+- 状态：已确认
+- Figma 链接：https://www.figma.com/design/BAUHQoPDltaMnWOMtE96Nw
+- 最后确认日期：2026-08-11
 
 ## 需求
 
@@ -119,8 +119,8 @@
 - [ ] 目标和成功标准已明确
 - [ ] 本次要做与不做的范围已明确
 - [ ] 核心流程已明确
-- [ ] Figma 已覆盖关键交互和异常状态
-- [ ] 已人工确认，可以进入开发
+- [x] Figma 已覆盖关键交互和异常状态
+- [x] 已人工确认，可以进入开发
 
 ## 开发备注
 
@@ -136,3 +136,16 @@
   - 气泡不抢焦点（点击气泡不要激活窗口）
   - JSON 文件定期自动备份，防止损坏丢失数据
   - 安装包控制在 50MB 以内
+
+## 任务连续性
+
+- 最终目标：在 Figma 中完成 `Desktop Task Bubble - Interaction` 的初版交互设计，覆盖规格中的组件、核心页面和异常状态，并将可编辑链接记录回本文件。
+- 范围：仅 Phase 1 设计工作；包括设计 token、组件及变体、页面组装、Interaction Map 和视觉/结构校验。
+- 非目标：本轮不写生产代码，不进入开发阶段，不把静态设计视为运行验收。
+- 完成条件：Figma 文件可访问；关键页面与状态已创建；变量、样式和组件结构经过检查；截图无明显裁切或重叠；Figma 链接已记录；待用户明确确认后才可进入开发。
+- 已完成及证据：2026-08-11 已完成 Figma 初版交互稿。文件包含 `Components`、`Interaction Map`、`Add Task`、`Desktop Bubbles`、`Menus & Panels` 5 页，12 个组件族、3 个变量集合、57 个变量、14 个 Paint Styles、5 个 Text Styles 和 3 个 Effect Styles；Add Task、桌面气泡、菜单与面板、主流程及空/加载失败/超时/计时结束等状态均已组装。最终读回审查为 0 broken aliases、0 `ALL_SCOPES`、0 missing WEB syntax、0 placeholder、0 missing fonts、0 空名称、0 断开实例；关键页面已重新截图验证。共享 Text Styles 与 Foundations 字体说明均已按用户确认改为 Noto Sans SC。
+- 当前执行游标：Figma 设计阶段已完成，停在 P4.f，等待用户人工审核。
+- 下一步唯一动作：用户打开 Figma 审核交互稿，并明确决定是否批准进入开发阶段。
+- 已确认决策：使用 `figma-spec.md` 作为初版 Figma 创建规格；保持本文件状态为“讨论中”；本轮不进入生产开发；设置面板移除导出/导入；Bubble 拆成“紧迫度 8 变体 + 计时状态 5 变体”；保持 5 页并在 Components 页展示 Foundations；共享字体使用 Noto Sans SC。
+- 待确认项：是否认可当前 Figma 初版交互稿并允许进入开发阶段。
+- 易变运行状态：2026-08-11 最终 QA 时 Figma 连接有效；目标文件含 5 个页面，Components 页 Foundations 节点为 `17:2`，Interaction Map 节点为 `81:210`（6000×1200）；本地 Figma 账本位于 `C:\Users\WIN10\AppData\Local\Temp\design-system-state-desktop-task-bubble-20260811.json`；未进入生产开发，未提交或推送 Git。
