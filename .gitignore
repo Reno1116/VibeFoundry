@@ -15,6 +15,7 @@ build/
 
 # Claude Code (local secrets)
 .claude/settings.local.json
+.mcp.json
 
 # Logs
 *.log
