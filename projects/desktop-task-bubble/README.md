@@ -36,7 +36,7 @@ python -m src.main
 
 ## 已知问题
 
-- 气泡面板在多显示器切换时需重启应用刷新位置
+- 托盘右键菜单在 Windows 上偶现不完整，仅显示"隐藏/显示气泡"一项。根因是 PySide6 `QSystemTrayIcon.setContextMenu()` 与 Windows 存在兼容性问题。下个版本可考虑用 `pystray` 替代 Qt 托盘
 - 快捷键修改目前仅支持 Ctrl/Shift/Alt 组合键
 - `keyboard` 库在某些安全软件下可能需要管理员权限
 
