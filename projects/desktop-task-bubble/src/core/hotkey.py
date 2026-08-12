@@ -1,37 +1,41 @@
 """全局快捷键管理器。"""
-import threading
-from typing import Callable
+from PySide6.QtCore import QObject, Signal
 
 import keyboard
 
 from src.core.config import DEFAULT_HOTKEY
 
 
-class HotkeyManager:
+class HotkeyManager(QObject):
     """注册和管理全局快捷键。
 
-    使用 `keyboard` 库实现全局热键监听，在独立线程中运行。
+    使用 `keyboard` 库实现全局热键监听。
+    热键触发时通过 Qt 信号 `triggered` 安全地通知主线程。
     """
 
-    def __init__(self, hotkey: str = DEFAULT_HOTKEY):
+    triggered = Signal()
+
+    def __init__(self, hotkey: str = DEFAULT_HOTKEY, parent=None):
+        super().__init__(parent)
         self._hotkey = hotkey
-        self._callback: Callable[[], None] | None = None
         self._running = False
         self._hook_id = None
-
-    def set_callback(self, callback: Callable[[], None]) -> None:
-        """设置热键触发时的回调函数。"""
-        self._callback = callback
 
     def start(self) -> None:
         """注册全局热键并开始监听。"""
         if self._running:
             return
         try:
-            self._hook_id = keyboard.add_hotkey(self._hotkey, self._handle_trigger)
+            print(f"[Hotkey] 注册: {self._hotkey}")
+            try:
+                keyboard.remove_hotkey(self._hotkey)
+            except Exception:
+                pass
+            self._hook_id = keyboard.add_hotkey(self._hotkey, self._fire)
             self._running = True
+            print(f"[Hotkey] 注册成功: {self._hotkey}")
         except Exception as e:
-            print(f"[Hotkey] 注册热键失败 ({self._hotkey}): {e}")
+            print(f"[Hotkey] 注册失败: {e}")
 
     def stop(self) -> None:
         """移除热键注册。"""
@@ -43,22 +47,21 @@ class HotkeyManager:
                 self._hook_id = None
             self._running = False
         except Exception as e:
-            print(f"[Hotkey] 移除热键失败: {e}")
+            print(f"[Hotkey] 移除失败: {e}")
 
     def update_hotkey(self, new_hotkey: str) -> None:
         """更换热键组合。"""
-        was_running = self._running
-        if was_running:
+        was = self._running
+        if was:
             self.stop()
         self._hotkey = new_hotkey
-        if was_running:
+        if was:
             self.start()
 
     @property
     def current_hotkey(self) -> str:
         return self._hotkey
 
-    def _handle_trigger(self) -> None:
-        """热键触发时的内部处理（在 keyboard 线程中运行）。"""
-        if self._callback:
-            self._callback()
+    def _fire(self) -> None:
+        """键盘库回调（在独立线程中）→ 发送 Qt 信号到主线程。"""
+        self.triggered.emit()

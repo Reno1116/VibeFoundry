@@ -14,9 +14,10 @@ from PySide6.QtWidgets import (
     QWidget,
     QSizePolicy,
 )
-from PySide6.QtCore import Qt, QDateTime, Signal
+from PySide6.QtCore import Qt, QDateTime, QTime, Signal
 
 from src.core.config import TIME_PRESETS, MAX_TITLE_LENGTH, DIALOG_RADIUS, INPUT_RADIUS, BUTTON_RADIUS
+from src.core.theme import theme
 
 
 class AddTaskDialog(QDialog):
@@ -78,7 +79,7 @@ class AddTaskDialog(QDialog):
     def _build_header(self, layout: QVBoxLayout) -> None:
         header = QHBoxLayout()
         label = QLabel("新增待办")
-        label.setStyleSheet("font-size:16px; font-weight:600; color:#212121;")
+        label.setStyleSheet(f"font-size:16px; font-weight:600; color:{theme.color('text_primary')};")
         header.addWidget(label)
         header.addStretch()
         layout.addLayout(header)
@@ -99,7 +100,7 @@ class AddTaskDialog(QDialog):
 
     def _build_priority(self, layout: QVBoxLayout) -> None:
         label = QLabel("优先级")
-        label.setStyleSheet("font-size:13px; font-weight:500; color:#757575;")
+        label.setStyleSheet(f"font-size:13px; font-weight:500; color:{theme.color('text_secondary')};")
         layout.addWidget(label)
 
         group = QButtonGroup(self)
@@ -125,7 +126,7 @@ class AddTaskDialog(QDialog):
 
     def _build_time_chips(self, layout: QVBoxLayout) -> None:
         label = QLabel("预计耗时")
-        label.setStyleSheet("font-size:13px; font-weight:500; color:#757575;")
+        label.setStyleSheet(f"font-size:13px; font-weight:500; color:{theme.color('text_secondary')};")
         layout.addWidget(label)
 
         row = QHBoxLayout()
@@ -165,13 +166,20 @@ class AddTaskDialog(QDialog):
 
     def _build_deadline(self, layout: QVBoxLayout) -> None:
         label = QLabel("截止时间（可选）")
-        label.setStyleSheet("font-size:13px; font-weight:500; color:#757575;")
+        label.setStyleSheet(f"font-size:13px; font-weight:500; color:{theme.color('text_secondary')};")
         layout.addWidget(label)
 
         self._deadline_edit = QDateTimeEdit()
         self._deadline_edit.setCalendarPopup(True)
         self._deadline_edit.setDisplayFormat("yyyy-MM-dd HH:mm")
-        self._deadline_edit.setMinimumDateTime(QDateTime.currentDateTime())
+        # 允许选今天，最小时间为今天 00:00
+        today_start = QDateTime.currentDateTime()
+        today_start.setTime(QTime(0, 0))
+        self._deadline_edit.setMinimumDateTime(today_start)
+        # 默认时间为今天 18:30
+        default_dt = QDateTime.currentDateTime()
+        default_dt.setTime(QTime(18, 30))
+        self._deadline_edit.setDateTime(default_dt)
         self._deadline_edit.setSpecialValueText("不设置截止时间")
         self._deadline_edit.setFixedHeight(40)
         self._deadline_edit.setStyleSheet(self._input_style())
@@ -291,11 +299,7 @@ class AddTaskDialog(QDialog):
             AddTaskDialog {{
                 background: transparent;
             }}
-            #container {{
-                background: #ffffff;
-                border-radius: {DIALOG_RADIUS}px;
-            }}
-        """
+        """ + theme.dialog_css()
 
     def _input_style(self) -> str:
         return f"""
@@ -313,12 +317,12 @@ class AddTaskDialog(QDialog):
         """
 
     def _radio_style(self) -> str:
-        return """
-            QRadioButton {
+        return f"""
+            QRadioButton {{
                 font-size: 13px;
-                color: #212121;
+                color: {theme.color('text_primary')};
                 spacing: 4px;
-            }
+            }}
         """
 
     def _chip_style(self, selected: bool) -> str:

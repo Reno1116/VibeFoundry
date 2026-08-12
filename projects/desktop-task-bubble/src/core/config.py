@@ -12,6 +12,7 @@ DATA_DIR.mkdir(parents=True, exist_ok=True)
 # 数据文件
 TASKS_FILE = DATA_DIR / "tasks.json"
 TASKS_BACKUP = DATA_DIR / "tasks.json.bak"
+SETTINGS_FILE = DATA_DIR / "settings.json"
 
 # 默认设置
 DEFAULT_HOTKEY = "ctrl+shift+n"

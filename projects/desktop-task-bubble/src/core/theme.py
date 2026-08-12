@@ -92,6 +92,88 @@ class ThemeManager:
     def bubble_bg(self, is_overtime: bool = False) -> str:
         return self.color("bubble_bg_overtime") if is_overtime else self.color("bubble_bg")
 
+    def dialog_css(self, extra: str = "") -> str:
+        """返回弹窗容器的主题 CSS。"""
+        return f"""
+            #container {{
+                background: {self.color('dialog_bg')};
+                border-radius: 12px;
+            }}
+            QLabel {{
+                color: {self.color('text_primary')};
+            }}
+            QLineEdit {{
+                border: 1px solid {self.color('border_subtle')};
+                border-radius: 8px;
+                padding: 0 12px;
+                font-size: 13px;
+                color: {self.color('text_primary')};
+                background: {self.color('dialog_bg')};
+            }}
+            QLineEdit:focus {{
+                border-color: {self.color('accent_primary')};
+            }}
+            QRadioButton {{
+                font-size: 13px;
+                color: {self.color('text_primary')};
+                spacing: 4px;
+            }}
+            QDateTimeEdit {{
+                border: 1px solid {self.color('border_subtle')};
+                border-radius: 8px;
+                padding: 0 12px;
+                font-size: 13px;
+                color: {self.color('text_primary')};
+                background: {self.color('dialog_bg')};
+            }}
+            QScrollArea {{
+                border: none;
+                background: transparent;
+            }}
+            QScrollBar:vertical {{
+                background: transparent;
+                width: 6px;
+            }}
+            QScrollBar::handle:vertical {{
+                background: {self.color('border_subtle')};
+                border-radius: 3px;
+            }}
+            QMenu {{
+                background: {self.color('menu_bg')};
+                border-radius: 8px;
+                padding: 4px;
+                min-width: 160px;
+            }}
+            QMenu::item {{
+                padding: 8px 12px;
+                border-radius: 4px;
+                font-size: 13px;
+                color: {self.color('text_primary')};
+            }}
+            QMenu::item:selected {{
+                background: {self.color('menu_hover')};
+            }}
+            QMenu::separator {{
+                height: 1px;
+                background: {self.color('border_subtle')};
+                margin: 4px 8px;
+            }}
+            {extra}
+        """
+
+    def bubble_css(self, bg_color: str) -> str:
+        """返回单个气泡的主题 CSS。"""
+        text = self.color("text_primary")
+        return f"""
+            BubbleWidget {{
+                background: {bg_color};
+                border-radius: 12px;
+            }}
+            QLabel {{
+                color: {text};
+            }}
+        """
+
 
 # 全局单例
 theme = ThemeManager()

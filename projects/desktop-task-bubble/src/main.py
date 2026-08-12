@@ -1,11 +1,11 @@
 """桌面任务气泡 — 应用入口。"""
 import sys
 from PySide6.QtWidgets import QApplication
-from PySide6.QtCore import QTimer
 
 from src.models.task import Task, TaskStore
 from src.core.hotkey import HotkeyManager
 from src.core.timer import TimerEngine
+from src.core.settings import AppSettings
 from src.ui.tray import SystemTray
 from src.ui.add_dialog import AddTaskDialog
 from src.ui.edit_dialog import EditTaskDialog
@@ -22,10 +22,16 @@ class App:
         self.store = TaskStore()
         self.hotkey = HotkeyManager()
         self.timer = TimerEngine(self.store)
+        self.settings = AppSettings()
         self.tray = SystemTray()
 
         # 气泡面板
-        self._bubble_panel = BubblePanel(self.store)
+        self._bubble_panel = BubblePanel(
+            self.store,
+            screen_name=self.settings.screen_name,
+            panel_opacity=self.settings.panel_opacity,
+            bubble_opacity=self.settings.bubble_opacity,
+        )
         self._bubble_panel.set_on_bubble_clicked(self._on_bubble_clicked)
 
         self._setup_connections()
@@ -33,7 +39,8 @@ class App:
 
     def _setup_connections(self) -> None:
         """连接托盘菜单和热键的回调。"""
-        self.hotkey.set_callback(self._on_add_task)
+        # 热键通过 Qt 信号连接（无需 QTimer 中转）
+        self.hotkey.triggered.connect(self._show_add_dialog)
 
         self.tray.set_on_toggle_bubbles(self._on_toggle_bubbles)
         self.tray.set_on_show_history(self._on_show_history)
@@ -46,14 +53,15 @@ class App:
     def _start(self) -> None:
         """启动应用：显示托盘、注册热键、显示气泡面板。"""
         self.tray.show()
+        self.tray.build_menu()  # show() 之后再构建菜单
+        print("[App] 托盘图标已显示")
         self.hotkey.start()
         self._bubble_panel.show()
+        panel_geo = self._bubble_panel.geometry()
+        print(f"[App] 气泡面板已显示: x={panel_geo.x()}, y={panel_geo.y()}, w={panel_geo.width()}, h={panel_geo.height()}")
         print(f"[App] 已启动，按 {self.hotkey.current_hotkey} 添加待办")
 
     # ── 新增待办 ──
-
-    def _on_add_task(self) -> None:
-        QTimer.singleShot(0, self._show_add_dialog)
 
     def _show_add_dialog(self) -> None:
         dialog = AddTaskDialog()
@@ -132,9 +140,32 @@ class App:
         def on_hotkey(new: str) -> None:
             self.hotkey.update_hotkey(new)
 
+        def on_panel_opacity(value: float) -> None:
+            self.settings.set_panel_opacity(value)
+            self._bubble_panel.set_panel_opacity(value)
+
+        def on_bubble_opacity(value: float) -> None:
+            self.settings.set_bubble_opacity(value)
+            self._bubble_panel.set_bubble_opacity(value)
+
+        def on_pin(enabled: bool) -> None:
+            if self._bubble_panel:
+                self._bubble_panel.set_always_on_top(enabled)
+
+        def on_screen(screen_name: str) -> None:
+            self.settings.set_screen_name(screen_name)
+            self._bubble_panel.set_screen(screen_name)
+
         panel = SettingsPanel(
             current_hotkey=self.hotkey.current_hotkey,
+            panel_opacity=self.settings.panel_opacity,
+            bubble_opacity=self.settings.bubble_opacity,
+            selected_screen_name=self.settings.screen_name,
             on_hotkey_changed=on_hotkey,
+            on_panel_opacity_changed=on_panel_opacity,
+            on_bubble_opacity_changed=on_bubble_opacity,
+            on_pin_changed=on_pin,
+            on_screen_changed=on_screen,
         )
         panel.exec()
 

@@ -32,6 +32,7 @@ python -m src.main
 - 系统托盘常驻，右键切换显示/隐藏
 - 跟随 Windows 深浅色主题
 - 多显示器支持
+- 面板透明度与气泡透明度可独立调节并自动保存
 
 ## 已知问题
 
@@ -50,3 +51,4 @@ python -m src.main
 ## 数据存储
 
 所有数据保存在 `%APPDATA%/desktop-task-bubble/tasks.json`，自动备份到 `.bak`。
+显示器选择保存在 `%APPDATA%/desktop-task-bubble/settings.json`。

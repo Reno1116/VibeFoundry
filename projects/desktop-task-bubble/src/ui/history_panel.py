@@ -11,7 +11,6 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QColor
 
 from src.models.task import Task, TaskStore
 from src.core.config import DIALOG_RADIUS, BUTTON_RADIUS
@@ -36,20 +35,13 @@ class HistoryPanel(QDialog):
             | Qt.WindowType.Dialog
         )
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
-        self.setStyleSheet(f"""
-            HistoryPanel {{
-                background: transparent;
-            }}
-        """)
+        self.setStyleSheet("HistoryPanel { background: transparent; }")
+
+        from src.core.theme import theme
 
         container = QWidget()
         container.setObjectName("container")
-        container.setStyleSheet(f"""
-            #container {{
-                background: #ffffff;
-                border-radius: {DIALOG_RADIUS}px;
-            }}
-        """)
+        container.setStyleSheet(theme.dialog_css())
 
         layout = QVBoxLayout(container)
         layout.setContentsMargins(20, 16, 20, 20)
@@ -58,24 +50,21 @@ class HistoryPanel(QDialog):
         # 标题栏
         header = QHBoxLayout()
         title = QLabel("已完成的任务")
-        title.setStyleSheet("font-size:16px; font-weight:600; color:#212121;")
+        title.setStyleSheet(f"font-size:16px; font-weight:600; color:{theme.color('text_primary')};")
         header.addWidget(title)
         header.addStretch()
 
         close_btn = QPushButton("✕")
         close_btn.setFixedSize(28, 28)
         close_btn.clicked.connect(self.close)
-        close_btn.setStyleSheet("""
-            QPushButton {
-                background: transparent;
-                border: none;
-                font-size: 14px;
-                color: #757575;
-            }
-            QPushButton:hover {
-                color: #212121;
-            }
-        """)
+        close_btn.setStyleSheet(
+            "QPushButton {"
+            f"  background: transparent; border: none; font-size: 14px; color: {theme.color('text_secondary')};"
+            "}"
+            " QPushButton:hover {"
+            f"  color: {theme.color('text_primary')};"
+            "}"
+        )
         header.addWidget(close_btn)
         layout.addLayout(header)
 
@@ -131,24 +120,22 @@ class HistoryPanel(QDialog):
             if item.widget():
                 item.widget().deleteLater()
 
+        from src.core.theme import theme as thm
         tasks = self._store.completed_tasks
         if not tasks:
             empty = QLabel("暂无已完成的任务")
             empty.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            empty.setStyleSheet("font-size:13px; color:#757575; padding: 40px 0;")
+            empty.setStyleSheet(f"font-size:13px; color:{thm.color('text_secondary')}; padding: 40px 0;")
             self._list_layout.insertWidget(0, empty)
             return
 
-        # 按日期分组
         groups: dict[str, list[Task]] = {}
         for t in tasks:
             date_key = t.created_at.strftime("%Y-%m-%d")
             groups.setdefault(date_key, []).append(t)
 
         for date_key, items in groups.items():
-            # 日期标签
             today = datetime.now().strftime("%Y-%m-%d")
-            yesterday = datetime.now().strftime("%Y-%m-%d")  # simplified
             if date_key == today:
                 label_text = "今天"
             else:
@@ -156,7 +143,7 @@ class HistoryPanel(QDialog):
 
             date_label = QLabel(label_text)
             date_label.setStyleSheet(
-                "font-size:11px; font-weight:600; color:#9E9E9E;"
+                f"font-size:11px; font-weight:600; color:{thm.color('text_hint')};"
                 "padding: 12px 0 4px 0;"
             )
             self._list_layout.insertWidget(self._list_layout.count() - 1, date_label)
@@ -167,38 +154,36 @@ class HistoryPanel(QDialog):
 
     def _build_history_item(self, task: Task) -> QWidget:
         """构建单个历史记录项。"""
+        from src.core.theme import theme as thm
+        border = thm.color('border_subtle')
         item = QWidget()
-        item.setStyleSheet("""
+        item.setStyleSheet(f"""
             background: transparent;
             padding: 8px 0;
-            border-bottom: 1px solid rgba(0,0,0,0.04);
+            border-bottom: 1px solid {border};
         """)
 
         layout = QHBoxLayout(item)
         layout.setContentsMargins(0, 4, 0, 4)
         layout.setSpacing(8)
 
-        # 优先级色点
         dot = QWidget()
         dot.setFixedSize(8, 8)
-        dot.setStyleSheet(
-            f"background: {task.color_accent}; border-radius: 4px;"
-        )
+        dot.setStyleSheet(f"background: {task.color_accent}; border-radius: 4px;")
         layout.addWidget(dot)
 
-        # 标题 + 时间
         text_layout = QVBoxLayout()
         text_layout.setSpacing(2)
 
         title = QLabel(task.title)
-        title.setStyleSheet("font-size:13px; font-weight:500; color:#212121;")
+        title.setStyleSheet(f"font-size:13px; font-weight:500; color:{thm.color('text_primary')};")
         text_layout.addWidget(title)
 
         time_str = task.created_at.strftime("%H:%M")
         detail = QLabel(
             f"预计 {task.estimated_minutes}m  ·  实际 {task.elapsed_seconds // 60}m  ·  {time_str}"
         )
-        detail.setStyleSheet("font-size:11px; color:#9E9E9E;")
+        detail.setStyleSheet(f"font-size:11px; color:{thm.color('text_hint')};")
         text_layout.addWidget(detail)
 
         layout.addLayout(text_layout, stretch=1)

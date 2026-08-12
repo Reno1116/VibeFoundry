@@ -1,7 +1,7 @@
 """气泡操作菜单。"""
 from PySide6.QtWidgets import QMenu, QWidget, QVBoxLayout
 from PySide6.QtCore import Qt, QPoint, Signal
-from PySide6.QtGui import QAction, QColor, QFont
+from PySide6.QtGui import QAction
 
 from src.models.task import Task
 
@@ -56,25 +56,5 @@ class BubbleContextMenu(QMenu):
         return action
 
     def _apply_style(self) -> None:
-        self.setStyleSheet("""
-            QMenu {
-                background: #ffffff;
-                border-radius: 8px;
-                padding: 4px;
-                min-width: 160px;
-            }
-            QMenu::item {
-                padding: 8px 12px;
-                border-radius: 4px;
-                font-size: 13px;
-                color: #212121;
-            }
-            QMenu::item:selected {
-                background: rgba(0, 0, 0, 0.04);
-            }
-            QMenu::separator {
-                height: 1px;
-                background: rgba(0, 0, 0, 0.06);
-                margin: 4px 8px;
-            }
-        """)
+        from src.core.theme import theme
+        self.setStyleSheet(theme.dialog_css())

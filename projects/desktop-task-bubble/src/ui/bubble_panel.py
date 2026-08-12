@@ -1,42 +1,53 @@
 """桌面右侧气泡面板容器。"""
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QLabel, QScrollArea, QFrame
-from PySide6.QtCore import Qt, QPropertyAnimation, QEasingCurve, QRect, QTimer
-from PySide6.QtGui import QScreen
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QLabel, QApplication
+from PySide6.QtCore import Qt, QTimer
+from PySide6.QtGui import QColor, QPainter, QPen
+from PySide6.QtCore import QRectF
+import re
 
 from src.models.task import Task, TaskStore
 from src.ui.bubble_widget import BubbleWidget
-from src.core.config import (
-    DEFAULT_BUBBLE_WIDTH,
-    BUBBLE_GAP,
-    PANEL_PADDING,
-)
+from src.core.config import DEFAULT_BUBBLE_WIDTH, BUBBLE_GAP, PANEL_PADDING
+
+
+def resolve_screen(screens, selected_name: str | None, primary_screen):
+    """按稳定的 Qt 屏幕名称查找目标，不存在时回退主屏。"""
+    if selected_name:
+        for screen in screens:
+            if screen.name() == selected_name:
+                return screen
+    return primary_screen
 
 
 class BubblePanel(QWidget):
-    """右侧置顶透明容器，纵向排列待办气泡。
+    """右侧置顶容器，纵向排列待办气泡。"""
 
-    作为无边框置顶窗口，位于屏幕右侧，不可抢焦点。
-    """
-
-    def __init__(self, store: TaskStore, parent=None):
+    def __init__(self, store: TaskStore, screen_name: str | None = None,
+                 panel_opacity: float = 1.0, bubble_opacity: float = 1.0,
+                 parent=None):
         super().__init__(parent)
         self._store = store
         self._bubble_widgets: dict[str, BubbleWidget] = {}
         self._on_bubble_clicked = None
+        self._screen_name = screen_name
+        self._panel_opacity = self._clamp_opacity(panel_opacity)
+        self._bubble_opacity = self._clamp_opacity(bubble_opacity)
 
         self._setup_window()
         self._setup_ui()
         self._store.on_change(self.refresh)
 
+        # 延迟定位，等事件循环启动
+        QTimer.singleShot(100, self._position_on_screen)
+
     def set_on_bubble_clicked(self, callback) -> None:
-        """设置气泡点击回调。callback(task, widget)。"""
         self._on_bubble_clicked = callback
 
     def refresh(self) -> None:
-        """根据 TaskStore 数据重建气泡列表。"""
+        """根据 TaskStore 重建气泡列表。"""
         tasks = self._store.pending_tasks
 
-        # 清除不在列表中的气泡
+        # 清除旧气泡
         current_ids = {t.id for t in tasks}
         removed = [tid for tid in self._bubble_widgets if tid not in current_ids]
         for tid in removed:
@@ -44,121 +55,157 @@ class BubblePanel(QWidget):
             self._bubble_layout.removeWidget(w)
             w.deleteLater()
 
-        # 添加或更新气泡
+        # 添加/更新气泡
         for i, task in enumerate(tasks):
             if task.id in self._bubble_widgets:
                 self._bubble_widgets[task.id].refresh(task)
             else:
-                bubble = BubbleWidget(task, self._content_widget)
+                bubble = BubbleWidget(task, opacity=self._bubble_opacity)
                 bubble.set_on_clicked(self._on_bubble_clicked)
                 self._bubble_widgets[task.id] = bubble
                 self._bubble_layout.insertWidget(i, bubble)
 
-        # 更新空状态
-        self._update_empty_state()
-        self._adjust_panel_size()
+        # 刷新空状态
+        self._empty_label.setVisible(len(tasks) == 0)
+        self._bubble_container.setVisible(len(tasks) > 0)
+        self._apply_style()
 
     # ── 窗口设置 ──
 
     def _setup_window(self) -> None:
-        """配置无边框置顶透明窗口。"""
         self.setWindowFlags(
             Qt.WindowType.FramelessWindowHint
             | Qt.WindowType.WindowStaysOnTopHint
             | Qt.WindowType.Tool
         )
+        # 顶层窗口必须允许 alpha 与桌面合成，否则 stylesheet 中的
+        # 半透明背景会先与默认不透明画布合成，20% 和 100% 几乎无差别。
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
-        self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating)  # 不抢焦点
-
-        # 定位到主屏幕右侧
-        self._position_on_screen()
+        self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating)
+        self.setMinimumWidth(DEFAULT_BUBBLE_WIDTH + PANEL_PADDING * 2)
+        self.setMinimumHeight(120)
 
     def _position_on_screen(self) -> None:
-        """将面板定位到主屏幕右侧。"""
-        screen = QScreen  # will be replaced with actual screen
-        if hasattr(self, "screen"):
-            screen = self.screen()
+        """定位到用户选择的屏幕右侧。"""
+        app = QApplication.instance()
+        if not app:
+            return
+        screen = resolve_screen(app.screens(), self._screen_name, app.primaryScreen())
         if not screen:
-            from PySide6.QtWidgets import QApplication
-            app = QApplication.instance()
-            if app:
-                screen = app.primaryScreen()
-        if screen:
-            geo = screen.availableGeometry()
-            panel_width = DEFAULT_BUBBLE_WIDTH + PANEL_PADDING * 2
-            self.setGeometry(
-                geo.right() - panel_width - PANEL_PADDING,
-                geo.top() + PANEL_PADDING,
-                panel_width,
-                geo.height() - PANEL_PADDING * 2,
-            )
+            return
+        geo = screen.availableGeometry()
+        pw = DEFAULT_BUBBLE_WIDTH + PANEL_PADDING * 2
+        x = geo.right() - pw - 8
+        y = geo.top() + 8
+        h = min(geo.height() - 16, 800)
+        self.setGeometry(x, y, pw, h)
+        print(
+            f"[BubblePanel] 定位屏幕 {screen.name()}: "
+            f"x={x}, y={y}, {pw}x{h}"
+        )
 
-    # ── 内部 UI ──
+    def set_screen(self, screen_name: str) -> None:
+        """切换目标屏幕并立即重新定位。"""
+        self._screen_name = screen_name
+        self._position_on_screen()
+
+    # ── UI ──
 
     def _setup_ui(self) -> None:
-        """构建内部 UI 结构。"""
         main_layout = QVBoxLayout(self)
         main_layout.setContentsMargins(PANEL_PADDING, PANEL_PADDING, PANEL_PADDING, PANEL_PADDING)
-        main_layout.setSpacing(0)
+        main_layout.setSpacing(BUBBLE_GAP)
 
-        # 内容区域（滚动）
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        scroll.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
-        scroll.setStyleSheet("QScrollArea { background: transparent; border: none; }")
-
-        self._content_widget = QWidget()
-        self._content_widget.setStyleSheet("background: transparent;")
-        self._bubble_layout = QVBoxLayout(self._content_widget)
-        self._bubble_layout.setContentsMargins(0, 0, 0, 0)
-        self._bubble_layout.setSpacing(BUBBLE_GAP)
-        self._bubble_layout.addStretch()  # 底部弹簧，让气泡从上到下排列
-
-        scroll.setWidget(self._content_widget)
-        main_layout.addWidget(scroll)
-
-        # 空状态提示
-        self._empty_label = QLabel("暂无待办，按 Ctrl+Shift+N 添加")
-        self._empty_label.setAlignment(
-            Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop
-        )
+        # 空状态
+        self._empty_label = QLabel("暂无待办\n按 Ctrl+Shift+N 添加")
+        self._empty_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._empty_label.setMinimumHeight(80)
         self._empty_label.setStyleSheet(
-            "font-size:13px; color:#757575; padding-top: 40px;"
-            "background: transparent;"
+            "font-size:13px; color:#555; background: transparent; padding:20px;"
         )
-        self._empty_label.setVisible(False)
         main_layout.addWidget(self._empty_label)
 
-    def _update_empty_state(self) -> None:
-        """更新空状态显示。"""
-        has_tasks = len(self._bubble_widgets) > 0
-        self._empty_label.setVisible(not has_tasks)
+        # 气泡容器
+        from PySide6.QtWidgets import QFrame
+        self._bubble_container = QFrame()
+        self._bubble_container.setStyleSheet("background: transparent;")
+        self._bubble_layout = QVBoxLayout(self._bubble_container)
+        self._bubble_layout.setContentsMargins(0, 0, 0, 0)
+        self._bubble_layout.setSpacing(BUBBLE_GAP)
+        self._bubble_layout.addStretch()
+        main_layout.addWidget(self._bubble_container, stretch=1)
 
-    def _adjust_panel_size(self) -> None:
-        """根据气泡数量调整面板高度。"""
-        task_count = len(self._bubble_widgets)
-        if task_count == 0:
-            return
+        self._apply_style()
 
-        # 计算需要的总高度
-        bubble_height = 72
-        total_height = task_count * bubble_height + (task_count - 1) * BUBBLE_GAP + PANEL_PADDING * 2
+    @staticmethod
+    def _clamp_opacity(value: float) -> float:
+        return max(0.2, min(1.0, float(value)))
 
-        # 限制最大高度为屏幕可用高度的 80%
-        screen = self.screen()
-        if screen:
-            max_height = int(screen.availableGeometry().height() * 0.8)
-            total_height = min(total_height, max_height)
-
-        # 更新面板位置（保持右侧对齐）
-        geo = self.geometry()
-        screen_geo = screen.availableGeometry() if screen else geo
-        panel_width = geo.width()
-        self.setGeometry(
-            screen_geo.right() - panel_width - PANEL_PADDING,
-            screen_geo.top() + PANEL_PADDING,
-            panel_width,
-            total_height,
+    @staticmethod
+    def _qcolor_with_opacity(color_value: str, opacity: float) -> QColor:
+        rgba_match = re.fullmatch(
+            r"rgba\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*([\d.]+)\s*\)",
+            color_value,
         )
+        if rgba_match:
+            red, green, blue = map(int, rgba_match.groups()[:3])
+            alpha = float(rgba_match.group(4))
+            color = QColor(red, green, blue)
+            color.setAlphaF(max(0.0, min(1.0, alpha)))
+        else:
+            color = QColor(color_value)
+        color.setAlphaF(max(0.0, min(1.0, color.alphaF() * opacity)))
+        return color
+
+    @staticmethod
+    def _color_with_opacity(color_value: str, opacity: float) -> str:
+        color = BubblePanel._qcolor_with_opacity(color_value, opacity)
+        return f"rgba({color.red()},{color.green()},{color.blue()},{color.alpha()})"
+
+    def set_panel_opacity(self, value: float) -> None:
+        """只调整面板背景，不改变任务气泡。"""
+        self._panel_opacity = self._clamp_opacity(value)
+        self._apply_style()
+
+    def set_bubble_opacity(self, value: float) -> None:
+        """只调整任务气泡，不改变面板背景。"""
+        self._bubble_opacity = self._clamp_opacity(value)
+        for bubble in self._bubble_widgets.values():
+            bubble.set_opacity(self._bubble_opacity)
+
+    def set_always_on_top(self, enabled: bool) -> None:
+        """切换置顶状态。"""
+        flags = self.windowFlags()
+        if enabled:
+            flags |= Qt.WindowType.WindowStaysOnTopHint
+        else:
+            flags &= ~Qt.WindowType.WindowStaysOnTopHint
+        self.setWindowFlags(flags)
+        self.show()
+
+    def _apply_style(self) -> None:
+        """更新独立的面板底板颜色。"""
+        from src.core.theme import theme
+        self._panel_background = self._qcolor_with_opacity(
+            theme.color("dialog_bg"), self._panel_opacity
+        )
+        self._panel_border = self._qcolor_with_opacity(
+            theme.color("border_subtle"), self._panel_opacity
+        )
+        text = theme.color("text_hint")
+        self.setStyleSheet("BubblePanel { background: transparent; }")
+        if not self._bubble_widgets:
+            self._empty_label.setStyleSheet(
+                f"font-size:13px; color:{text}; background: transparent; padding:20px;"
+            )
+        self.update()
+
+    def paintEvent(self, event) -> None:
+        """在透明顶层窗口上显式绘制带 alpha 的面板底板。"""
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        painter.setBrush(self._panel_background)
+        painter.setPen(QPen(self._panel_border, 1))
+        painter.drawRoundedRect(QRectF(self.rect()).adjusted(0.5, 0.5, -0.5, -0.5), 12, 12)
+        painter.end()
+        super().paintEvent(event)

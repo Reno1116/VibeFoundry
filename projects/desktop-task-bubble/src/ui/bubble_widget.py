@@ -1,10 +1,13 @@
 """单个任务气泡组件。"""
-from PySide6.QtWidgets import QWidget, QLabel, QHBoxLayout, QVBoxLayout, QGraphicsDropShadowEffect
-from PySide6.QtCore import Qt, QTimer
+from PySide6.QtWidgets import (
+    QWidget, QLabel, QHBoxLayout, QVBoxLayout,
+    QGraphicsOpacityEffect,
+)
+from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor
 
 from src.models.task import Task
-from src.core.config import BUBBLE_RADIUS, MAX_TITLE_LENGTH
+from src.core.config import MAX_TITLE_LENGTH
 
 
 class BubbleWidget(QWidget):
@@ -14,10 +17,11 @@ class BubbleWidget(QWidget):
     点击气泡触发 `clicked` 回调。
     """
 
-    def __init__(self, task: Task, parent=None):
+    def __init__(self, task: Task, opacity: float = 1.0, parent=None):
         super().__init__(parent)
         self.task = task
         self._clicked_callback = None
+        self._opacity = max(0.2, min(1.0, opacity))
 
         self._setup_ui()
         self.refresh(task)
@@ -44,9 +48,9 @@ class BubbleWidget(QWidget):
 
         # 超时整卡变红
         if task.is_overtime:
-            self.setStyleSheet(self._bubble_style(task.color_accent))
+            self._card.setStyleSheet(self._bubble_style(task.color_accent))
         else:
-            self.setStyleSheet(self._bubble_style("#ffffff"))
+            self._card.setStyleSheet(self._bubble_style("#ffffff"))
 
         # 计时显示
         self._update_time_display()
@@ -56,17 +60,24 @@ class BubbleWidget(QWidget):
         self.setFixedHeight(72)
         self.setMinimumWidth(280)
         self.setMaximumWidth(320)
-        self.setStyleSheet(self._bubble_style("#ffffff"))
+        self.setStyleSheet("background: transparent;")
 
-        # 投影
-        shadow = QGraphicsDropShadowEffect(self)
-        shadow.setBlurRadius(8)
-        shadow.setOffset(0, 2)
-        shadow.setColor(QColor(0, 0, 0, 20))
-        self.setGraphicsEffect(shadow)
+        # 只使用一层离屏效果。Qt 在外层阴影 + 内层透明度的嵌套
+        # QGraphicsEffect 下会重算缓存边界，导致调整透明度后左色条跳位。
+        self._opacity_effect = QGraphicsOpacityEffect(self)
+        self._opacity_effect.setOpacity(self._opacity)
+        self.setGraphicsEffect(self._opacity_effect)
 
-        # 主布局
-        layout = QHBoxLayout(self)
+        # 卡片放在稳定的外层点击区中。
+        outer_layout = QVBoxLayout(self)
+        outer_layout.setContentsMargins(0, 0, 0, 0)
+        outer_layout.setSpacing(0)
+        self._card = QWidget()
+        self._card.setStyleSheet(self._bubble_style("#ffffff"))
+        outer_layout.addWidget(self._card)
+
+        # 卡片主布局
+        layout = QHBoxLayout(self._card)
         layout.setContentsMargins(0, 0, 12, 0)
         layout.setSpacing(12)
 
@@ -77,10 +88,15 @@ class BubbleWidget(QWidget):
         self._strip.setStyleSheet("background:#42A5F5; border-radius:4px;")
         layout.addWidget(self._strip)
 
+        from src.core.theme import theme
+        text_color = theme.color("text_primary")
+        secondary = theme.color("text_secondary")
+        hint = theme.color("text_hint")
+
         # 标题区域
         self._title_label = QLabel("")
         self._title_label.setStyleSheet(
-            "font-size:13px; font-weight:500; color:#212121;"
+            f"font-size:13px; font-weight:500; color:{text_color};"
         )
         self._title_label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
         layout.addWidget(self._title_label, stretch=1)
@@ -96,18 +112,23 @@ class BubbleWidget(QWidget):
         self._time_value_label = QLabel("")
         self._time_value_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._time_value_label.setStyleSheet(
-            "font-size:11px; font-weight:500; color:#757575;"
+            f"font-size:11px; font-weight:500; color:{secondary};"
         )
         time_layout.addWidget(self._time_value_label)
 
         self._time_hint_label = QLabel("")
         self._time_hint_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._time_hint_label.setStyleSheet(
-            "font-size:10px; color:#9E9E9E;"
+            f"font-size:10px; color:{hint};"
         )
         time_layout.addWidget(self._time_hint_label)
 
         layout.addWidget(time_container)
+
+    def set_opacity(self, value: float) -> None:
+        """设置气泡卡片整体透明度 0.2-1.0。"""
+        self._opacity = max(0.2, min(1.0, value))
+        self._opacity_effect.setOpacity(self._opacity)
 
     def _update_time_display(self) -> None:
         """更新计时显示区域。"""
@@ -142,9 +163,5 @@ class BubbleWidget(QWidget):
 
     @staticmethod
     def _bubble_style(bg_color: str) -> str:
-        return f"""
-            BubbleWidget {{
-                background: {bg_color};
-                border-radius: {BUBBLE_RADIUS}px;
-            }}
-        """
+        from src.core.theme import theme
+        return theme.bubble_css(bg_color)
